@@ -1,0 +1,3 @@
+[build]
+  command = "docker build -t shopping-backend ."
+  publish = "/server.js" # Directory to publish
