@@ -1,6 +1,0 @@
-[build]
-  command = "docker build -t shopping-backend ."
-  publish = "/server.js" # Directory to publish
-
-[start]
-    run = "docker run -d -p 5000:5000 --name shopping-backend shopping-backend"
