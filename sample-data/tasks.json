@@ -1,0 +1,14 @@
+[
+  { "taskName": "Review products below reorder level", "completed": false },
+  { "taskName": "Confirm pending customer orders", "completed": false },
+  { "taskName": "Prepare marketplace settlement reconciliation", "completed": false },
+  { "taskName": "Check delayed shipments with courier partners", "completed": false },
+  { "taskName": "Validate the next purchase order quantities", "completed": false },
+  { "taskName": "Reply to customers awaiting delivery updates", "completed": false },
+  { "taskName": "Audit failed and pending payments", "completed": false },
+  { "taskName": "Review this week's product margins", "completed": true },
+  { "taskName": "Reconcile delivered revenue", "completed": true },
+  { "taskName": "Export the monthly order backup", "completed": true },
+  { "taskName": "Update seasonal product descriptions", "completed": true },
+  { "taskName": "Complete the weekly inventory count", "completed": true }
+]
