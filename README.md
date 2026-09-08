@@ -16,7 +16,7 @@ Production-oriented API for the Shopboard multi-tenant order and inventory dashb
 
 ## Requirements
 
-- Node.js 22+
+- Node.js 22.22.2+
 - MongoDB Atlas or another replica set. Imports, order placement, reset, and deletion use transactions.
 
 ## Local development
@@ -39,9 +39,10 @@ npm run email:verify
 
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
-| `MONGO_URI` | Yes | — | MongoDB replica-set or Atlas connection string |
+| `MONGO_URI` | Yes | — | MongoDB replica-set or Atlas connection string; legacy `MONGO_PUBLIC_URL` also works |
 | `JWT_SECRET` | Yes | — | Access-token signing and OTP HMAC key; minimum 24 characters |
 | `ACCESS_TOKEN_EXPIRES_IN` | No | `15m` | Short-lived access-token lifetime |
+| `NODE_ENV` | Production | — | Set `production` for hardened runtime defaults |
 | `PORT` / `BACKEND_PORT` | No | `5000` | Local HTTP port |
 | `CORS_ORIGIN` | Direct browser access only | local allow / production deny | Comma-separated allowed frontend origins; the same-origin Netlify proxy does not need it |
 | `COOKIE_SECURE` | No | production-aware | Set `true` on Netlify and `false` for local HTTP |
@@ -49,6 +50,7 @@ npm run email:verify
 | `TRUST_PROXY` | No | production-aware | Set `1` behind a reverse proxy |
 | `SMTP_HOST` | Password reset | — | Hostinger SMTP host, normally `smtp.hostinger.com` |
 | `SMTP_PORT` | Password reset | `465` | SMTP port |
+| `SMTP_SECURE` | No | inferred from port | Set `true` for Hostinger port 465 |
 | `SMTP_USER` | Password reset | — | Hostinger mailbox address |
 | `SMTP_PASS` | Password reset | — | Hostinger mailbox password |
 | `SMTP_FROM` | No | `SMTP_USER` | Display name and sender address |
@@ -58,9 +60,11 @@ npm run email:verify
 This repository includes [`netlify.toml`](./netlify.toml) and [`netlify/functions/api.js`](./netlify/functions/api.js). In the backend Netlify site:
 
 1. Set this repository directory as the site base.
-2. Configure `MONGO_URI`, a strong `JWT_SECRET`, `ACCESS_TOKEN_EXPIRES_IN=15m`, `COOKIE_SECURE=true`, `COOKIE_SAME_SITE=lax`, `TRUST_PROXY=1`, and the Hostinger `SMTP_*` variables.
+2. Configure `MONGO_URI`, a strong `JWT_SECRET`, `ACCESS_TOKEN_EXPIRES_IN=15m`, `NODE_ENV=production`, `COOKIE_SECURE=true`, `COOKIE_SAME_SITE=lax`, `TRUST_PROXY=1`, and the Hostinger `SMTP_*` variables.
 3. Deploy. Requests to `/api/*` are routed to the Express Function.
 4. Copy the deployed site origin, such as `https://shopboard-api.netlify.app`, into the frontend site's `BACKEND_SERVICE_URL`.
+
+Node 22.22.2 is pinned in `netlify.toml` for consistent local, CI, and Function behavior.
 
 The frontend's same-origin proxy is the recommended browser path. It keeps the refresh cookie first-party on the frontend domain and forwards it to this service.
 
