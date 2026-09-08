@@ -9,6 +9,12 @@ const UserSchema = new mongoose.Schema({
   storeName: { type: String, trim: true, default: 'My Store' },
   currency: { type: String, enum: ['INR', 'USD', 'EUR', 'GBP'], default: 'INR' },
   role: { type: String, enum: ['ADMIN'], default: 'ADMIN' },
+  authVersion: { type: Number, default: 0, min: 0 },
+  reportPreferences: {
+    frequency: { type: String, enum: ['PAUSED', 'DAILY', 'WEEKLY'], default: 'PAUSED' },
+    recipient: { type: String, trim: true, lowercase: true },
+    timeZone: { type: String, default: 'Asia/Kolkata' },
+  },
 }, { timestamps: true });
 
 UserSchema.set('toJSON', {

@@ -31,8 +31,19 @@ function assertEmail(value) {
   return email;
 }
 
+function assertStrongPassword(value) {
+  const password = requiredString(value, 'Password', { min: 10, max: 72 });
+  if (Buffer.byteLength(password, 'utf8') > 72) {
+    throw new ApiError(400, 'Password must not exceed 72 UTF-8 bytes.', 'WEAK_PASSWORD');
+  }
+  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password)) {
+    throw new ApiError(400, 'Password must include uppercase, lowercase, and numeric characters.', 'WEAK_PASSWORD');
+  }
+  return password;
+}
+
 function escapeRegex(value = '') {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-module.exports = { assertEmail, escapeRegex, nonNegativeNumber, optionalString, requiredString };
+module.exports = { assertEmail, assertStrongPassword, escapeRegex, nonNegativeNumber, optionalString, requiredString };

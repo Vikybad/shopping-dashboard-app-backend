@@ -17,4 +17,15 @@ function getPort() {
   return Number.isInteger(value) && value > 0 ? value : 5000;
 }
 
-module.exports = { assertRuntimeConfig, getAllowedOrigins, getPort };
+function getCookieOptions() {
+  const secure = process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: process.env.COOKIE_SAME_SITE || 'lax',
+    path: '/api/users',
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+  };
+}
+
+module.exports = { assertRuntimeConfig, getAllowedOrigins, getCookieOptions, getPort };

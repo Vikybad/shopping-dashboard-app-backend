@@ -1,4 +1,3 @@
-const crypto = require('crypto');
 const express = require('express');
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
@@ -8,14 +7,10 @@ const auth = require('../middleware/auth');
 const { ApiError, asyncHandler } = require('../middleware/error');
 const { assertTransition, calculateTotals } = require('../services/orderDomain');
 const { escapeRegex, nonNegativeNumber, optionalString, requiredString } = require('../utils/validation');
+const createOrderNumber = require('../utils/orderNumber');
 
 const router = express.Router();
 router.use(auth);
-
-function createOrderNumber() {
-  const day = new Date().toISOString().slice(0, 10).replaceAll('-', '');
-  return `ORD-${day}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-}
 
 function parseItems(rawItems) {
   if (!Array.isArray(rawItems) || rawItems.length === 0 || rawItems.length > 50) {

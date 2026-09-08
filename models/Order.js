@@ -7,6 +7,7 @@ const OrderSchema = new mongoose.Schema({
   customerPhone: { type: String, trim: true },
   customerImage: { type: String },
   orderNumber: { type: String, required: true },
+  externalReference: { type: String, trim: true, maxlength: 80 },
   orderReceiveDate: { type: Date, default: Date.now },
   orderDeliveredOnDate: { type: Date },
   shippedAt: { type: Date },
@@ -45,5 +46,6 @@ const OrderSchema = new mongoose.Schema({
 
 OrderSchema.index({ userId: 1, orderNumber: 1 }, { unique: true });
 OrderSchema.index({ userId: 1, orderReceiveDate: -1 });
+OrderSchema.index({ userId: 1, externalReference: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('Order', OrderSchema);
