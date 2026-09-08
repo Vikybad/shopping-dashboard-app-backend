@@ -1,16 +1,13 @@
 const mongoose = require('mongoose');
-require('dotenv').config();
-
-let dbUrl = process.env?.MONGO_URI || process.env?.MONGO_PUBLIC_URL
-console.log(`dbUrl: ${dbUrl}`);
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(dbUrl);
+    const dbUrl = process.env.MONGO_URI || process.env.MONGO_PUBLIC_URL;
+    await mongoose.connect(dbUrl, { serverSelectionTimeoutMS: 10000 });
     console.log('MongoDB connected');
   } catch (error) {
-    console.error('MongoDB connection error:', error);
-    process.exit(1);
+    console.error('MongoDB connection error:', error.message);
+    throw error;
   }
 };
 

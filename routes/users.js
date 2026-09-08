@@ -1,91 +1,84 @@
 const express = require('express');
-const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const { ApiError, asyncHandler } = require('../middleware/error');
+const { assertEmail, optionalString, requiredString } = require('../utils/validation');
 
-// Register user
-router.post('/register', async (req, res) => {
-  try {
-    console.log('HIT on register api', req.body);
-    const { username, email, password, mobileNumber, image } = req.body;
-    if (!(username || email || mobileNumber)) {
-      return res.send({ msg: `Please enter username or email or mobileNumber` })
-    }
-    if (!password) {
-      return res.send({ msg: `Please enter the password` })
-    }
-    let user = await User.findOne({ $or: [{ email }, { username }, { mobileNumber }] });
-    if (user) return res.json({ msg: 'User already exists' });
+const router = express.Router();
 
-    user = new User({ username, email, password, mobileNumber, image });
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(password, salt);
-    await user.save();
+function createToken(user) {
+  return jwt.sign(
+    { user: { id: user.id, role: user.role } },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '8h' },
+  );
+}
 
-    const payload = { user: { id: user.id } };
-    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, token) => {
-      if (err) throw err;
-      res.json({ token });
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
+function publicUser(user) {
+  const value = user.toObject ? user.toObject() : { ...user };
+  delete value.password;
+  delete value.__v;
+  return value;
+}
+
+router.post('/register', asyncHandler(async (req, res) => {
+  const username = requiredString(req.body.username, 'Username', { min: 2, max: 60 });
+  const email = assertEmail(req.body.email);
+  const password = requiredString(req.body.password, 'Password', { min: 8, max: 72 });
+  const mobileNumber = optionalString(req.body.mobileNumber, 'Mobile number', 20);
+  const storeName = optionalString(req.body.storeName, 'Store name', 80) || `${username}'s Store`;
+
+  const identities = [{ email }, { username }];
+  if (mobileNumber) identities.push({ mobileNumber });
+  const existing = await User.findOne({ $or: identities });
+  if (existing) throw new ApiError(409, 'An account with that email or username already exists.', 'USER_EXISTS');
+
+  const user = await User.create({
+    username,
+    email,
+    mobileNumber,
+    storeName,
+    password: await bcrypt.hash(password, 12),
+  });
+
+  res.status(201).json({ token: createToken(user), user: publicUser(user) });
+}));
+
+router.post('/login', asyncHandler(async (req, res) => {
+  const login = requiredString(req.body.login, 'Email or username', { min: 2, max: 254 });
+  const password = requiredString(req.body.password, 'Password', { min: 1, max: 72 });
+  const user = await User.findOne({
+    $or: [{ email: login.toLowerCase() }, { username: login }, { mobileNumber: login }],
+  }).select('+password');
+
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    throw new ApiError(401, 'The email/username or password is incorrect.', 'INVALID_CREDENTIALS');
   }
-});
 
-// Login user
-router.post('/login', async (req, res) => {
-  try {
-    console.log('HIT on login api', req.body);
-    const { login, password } = req.body;
-    if (!(login)) {
-      return res.send({ msg: `Please enter username/email/mobileNumber` });
-    }
-    if (!password) {
-      return res.send({ msg: `Please enter the password to login` });
-    }
-    let user = await User.findOne({
-      $or: [{ email: login }, { username: login }, { mobileNumber: login }]
-    });
-    console.log('user:', user);
-    if (!user) return res.json({ msg: 'NO USER FOUND' });
+  res.json({ token: createToken(user), user: publicUser(user) });
+}));
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.json({ msg: 'Invalid Credentials' });
+router.get('/me', auth, asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user.id);
+  if (!user) throw new ApiError(404, 'User not found.', 'USER_NOT_FOUND');
+  res.json({ data: user });
+}));
 
-    const payload = { user: { id: user.id } };
-    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, token) => {
-      if (err) throw err;
-      res.json({ token });
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
+router.patch('/me', auth, asyncHandler(async (req, res) => {
+  const update = {};
+  if (req.body.username !== undefined) update.username = requiredString(req.body.username, 'Username', { min: 2, max: 60 });
+  if (req.body.storeName !== undefined) update.storeName = requiredString(req.body.storeName, 'Store name', { min: 2, max: 80 });
+  if (req.body.mobileNumber !== undefined) update.mobileNumber = optionalString(req.body.mobileNumber, 'Mobile number', 20);
+  if (req.body.image !== undefined) update.image = optionalString(req.body.image, 'Image URL', 500);
+  if (req.body.currency !== undefined) {
+    if (!['INR', 'USD', 'EUR', 'GBP'].includes(req.body.currency)) throw new ApiError(400, 'Unsupported currency.', 'VALIDATION_ERROR');
+    update.currency = req.body.currency;
   }
-});
-
-// Get user data
-router.get('/me', auth, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id).select('-password');
-    res.json(user);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
-  }
-});
-
-// Delete user
-router.delete('/me', auth, async (req, res) => {
-  try {
-    await User.findByIdAndDelete(req.user.id);
-    res.send({ data: 'User deleted successfully' });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
-  }
-});
+  const user = await User.findOneAndUpdate({ _id: req.user.id }, update, { new: true, runValidators: true });
+  if (!user) throw new ApiError(404, 'User not found.', 'USER_NOT_FOUND');
+  res.json({ data: user });
+}));
 
 module.exports = router;

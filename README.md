@@ -1,103 +1,75 @@
-# shopping-dashboard-app-backend
+# Shopboard API
 
-## Basic info about this project
-- Implemented using Node.js and Express framework for server-side logic.
-- Utilized MongoDB for efficient data storage and retrieval.
-- Integrated JWT for secure user authentication and authorization.
-- Employed Nodemon for streamlined development and load balancing.
-- Containerized with Docker for consistent deployment.
-- Implemented CI/CD pipeline using Railway.app for automated deployment.
+The backend for Shopboard, a multi-tenant order and inventory operations dashboard. It exposes authenticated APIs for products, stock movements, orders, operational tasks, and dashboard analytics.
 
+## What is implemented
 
+- JWT authentication with password hashing and owner-scoped data access
+- Product catalogue with search, pagination, low-stock filtering, soft archival, and configurable reorder levels
+- Audited stock movements for opening balances, manual adjustments, orders, and cancellations
+- Transactional order placement: prices/costs are snapshotted and stock is deducted with a concurrency guard
+- Controlled order workflow: `PENDING → CONFIRMED → PROCESSING → SHIPPED → DELIVERED`, with cancellation allowed before shipment
+- Live revenue, profit, fulfilment, inventory-value, product, and 14-day trend analytics
+- Consistent validation/error responses, CORS allow-listing, security headers, rate limiting, graceful shutdown, and health checks
+- Node test suite and production Docker image
 
-#### Use the below link for frontend of this web application
-- [Frontend Repo](http://github.com/Vikybad/shopping-dashboard-app-frontend)
+## Requirements
 
+- Node.js 22+
+- MongoDB replica set or MongoDB Atlas. Order creation uses transactions so a standalone MongoDB process is not sufficient.
 
+## Local setup
 
-### Technologies Used
-<!-- List the technologies used with badges -->
-![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
-![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
-![NodeJS](https://img.shields.io/badge/node.js-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)
-![MongoDB](https://img.shields.io/badge/MongoDB-%234ea94b.svg?style=for-the-badge&logo=mongodb&logoColor=white)
-![Express](https://img.shields.io/badge/Express%20Server-grey?style=for-the-badge&logo=express)
-
-
-
-<!-- Instructions to get a local copy up and running -->
-To get a local copy up and running, follow these simple steps.
-
-### Prerequisites
-<!-- List necessary software prerequisites -->
-Ensure you have the following software installed:
-- `mongoDB`, `Node.js` and `npm`
-
-
-<!-- Step-by-step installation instructions -->
-Clone the repo to get started
-```sh
-git@github.com:Vikybad/shopping-dashboard-app-backend.git
+```bash
+cp .env.example .env
+npm ci
+npm run dev
 ```
 
+Set a new random `JWT_SECRET` of at least 24 characters. Never commit `.env`.
 
-### To run the backend server on your local machine after cloning the repo
-1. Navigate to the directory
-   ```sh
-   cd shopping-dashboard-app-backend
-   ```
-2. install the dependencies for backend
-   ```sh
-   npm install
-   ```
+The API starts on `http://localhost:5000`; health is available at `GET /api/health`.
 
+## Environment
 
-## Usage
-<!-- Instructions on how to run the backend server -->
-- To run the backend run the following command:
-```sh
-npm start
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `MONGO_URI` | Yes | — | MongoDB replica-set or Atlas connection string |
+| `JWT_SECRET` | Yes | — | JWT signing key, minimum 24 characters |
+| `JWT_EXPIRES_IN` | No | `8h` | Access-token lifetime |
+| `PORT` | No | `5000` | HTTP port |
+| `CORS_ORIGIN` | Production | allow all | Comma-separated frontend origins |
+
+## API map
+
+All routes except registration, login, and health require `Authorization: Bearer <token>`.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/users/register` | Create an admin/store |
+| `POST` | `/api/users/login` | Authenticate by email, username, or mobile |
+| `GET/PATCH` | `/api/users/me` | Read/update the current profile |
+| `GET/POST` | `/api/inventory` | Search/list or create products |
+| `PATCH` | `/api/inventory/:id` | Update catalogue fields |
+| `PATCH` | `/api/inventory/:id/stock` | Record a stock adjustment |
+| `GET` | `/api/inventory/:id/movements` | Read stock audit history |
+| `DELETE` | `/api/inventory/:id` | Soft-archive a product |
+| `GET/POST` | `/api/orders` | Search/list or place orders |
+| `GET` | `/api/orders/:id` | Read one order |
+| `PATCH` | `/api/orders/:id/status` | Move to an allowed fulfilment state |
+| `GET` | `/api/dashboard/overview` | Store KPIs, trends, alerts, and recent orders |
+| `GET/POST` | `/api/tasks` | List or create tasks |
+| `PATCH/DELETE` | `/api/tasks/:id` | Update or remove a task |
+
+Successful collection responses use `{ data, pagination }`; item responses use `{ data }`. Errors use `{ message, code, details? }`.
+
+## Quality commands
+
+```bash
+npm test
+npm run check
+npm audit --audit-level=high
+docker build -t shopboard-api .
 ```
-or
-```sh
-node server.js
-```
 
-# Visit Site on localhost
-#### Here you will see the page to redirect to frontend i.e. hosted on free hosting platform - Netlify
-```sh
-http://localhost:5000
-```
-
-
-## Contributing
-
-<!-- Contribution guidelines -->
-We welcome contributions from all developers and power users! To add new features or suggest improvements, follow these steps:
-
-1. Fork this repository to your own GitHub account.
-2. Clone the forked repository to your local machine.
-3. Create a new branch for your changes: `git checkout -b feature/add-new-feature`
-4. Make your changes to the `README.md` file or add new files as necessary.
-5. Commit your changes: `git commit -m "Add new feature for XYZ"`
-6. Push the changes to your GitHub fork: `git push origin feature/add-new-feature`
-7. Open a pull request from your forked repository to this original repository.
-
-
-
-## Contact
-
-<!-- Contact information -->
-- **Email**: [08.vikrambadesara@gmail.com](mailto:ranitmanik.dev@gmail.com)
-- **LinkedIn**: [Vikram Badesara](https://www.linkedin.com/in/vikrambadesara/)
-- **GitHub**: [Vikybad](https://github.com/Vikybad/)
-
-_Feel free to reach out if you have questions or just want to chat about web adventures!_
-
----
-
-<!-- Closing message -->
-<p align="center">
-    Thank you for using the <strong>README Template</strong>! Happy coding! 🚀
-</p>
-
+The checked-in legacy aliases (`get-orders`, `add-order`, and task equivalents) remain temporarily available for older clients; new code should use the REST paths above.
