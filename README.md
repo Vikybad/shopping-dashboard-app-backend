@@ -1,103 +1,120 @@
-# shopping-dashboard-app-backend
+# Shopboard API
 
-## Basic info about this project
-- Implemented using Node.js and Express framework for server-side logic.
-- Utilized MongoDB for efficient data storage and retrieval.
-- Integrated JWT for secure user authentication and authorization.
-- Employed Nodemon for streamlined development and load balancing.
-- Containerized with Docker for consistent deployment.
-- Implemented CI/CD pipeline using Railway.app for automated deployment.
+Production-oriented API for the Shopboard multi-tenant order and inventory dashboard. It runs as a regular Express service locally and as a Netlify Function in production.
 
+## Included capabilities
 
+- Short-lived JWT access tokens and rotating, hashed refresh sessions in an HttpOnly cookie
+- Password reset with a six-digit, single-use, expiring OTP delivered through Hostinger SMTP
+- Owner-scoped products, stock movements, orders, dashboard analytics, and operational tasks
+- Transactional order placement and CSV imports with stock consistency checks
+- Product and multi-line order CSV templates, atomic imports, and formula-safe exports
+- Realistic sample workspace creation for empty accounts
+- Password-protected operational-data reset and permanent account deletion
+- Report preferences modelled as `PAUSED`, `DAILY`, or `WEEKLY`; automated report delivery is intentionally paused and no scheduler is enabled
+- Validation, structured errors, CORS allow-listing, rate limiting, security headers, tests, health checks, and graceful shutdown
 
-#### Use the below link for frontend of this web application
-- [Frontend Repo](http://github.com/Vikybad/shopping-dashboard-app-frontend)
+## Requirements
 
+- Node.js 22.22.2+
+- MongoDB Atlas or another replica set. Imports, order placement, reset, and deletion use transactions.
 
+## Local development
 
-### Technologies Used
-<!-- List the technologies used with badges -->
-![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
-![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
-![NodeJS](https://img.shields.io/badge/node.js-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)
-![MongoDB](https://img.shields.io/badge/MongoDB-%234ea94b.svg?style=for-the-badge&logo=mongodb&logoColor=white)
-![Express](https://img.shields.io/badge/Express%20Server-grey?style=for-the-badge&logo=express)
-
-
-
-<!-- Instructions to get a local copy up and running -->
-To get a local copy up and running, follow these simple steps.
-
-### Prerequisites
-<!-- List necessary software prerequisites -->
-Ensure you have the following software installed:
-- `mongoDB`, `Node.js` and `npm`
-
-
-<!-- Step-by-step installation instructions -->
-Clone the repo to get started
-```sh
-git@github.com:Vikybad/shopping-dashboard-app-backend.git
+```bash
+cp .env.example .env
+npm ci
+npm run dev
 ```
 
+The API starts on `http://localhost:5000`; health is at `GET /api/health`.
 
-### To run the backend server on your local machine after cloning the repo
-1. Navigate to the directory
-   ```sh
-   cd shopping-dashboard-app-backend
-   ```
-2. install the dependencies for backend
-   ```sh
-   npm install
-   ```
+Use a new random `JWT_SECRET` of at least 24 characters and never commit `.env`. Verify the configured SMTP account without sending an email with:
 
-
-## Usage
-<!-- Instructions on how to run the backend server -->
-- To run the backend run the following command:
-```sh
-npm start
-```
-or
-```sh
-node server.js
+```bash
+npm run email:verify
 ```
 
-# Visit Site on localhost
-#### Here you will see the page to redirect to frontend i.e. hosted on free hosting platform - Netlify
-```sh
-http://localhost:5000
+## Environment
+
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `MONGO_URI` | Yes | — | MongoDB replica-set or Atlas connection string; legacy `MONGO_PUBLIC_URL` also works |
+| `JWT_SECRET` | Yes | — | Access-token signing and OTP HMAC key; minimum 24 characters |
+| `ACCESS_TOKEN_EXPIRES_IN` | No | `15m` | Short-lived access-token lifetime |
+| `NODE_ENV` | Production | — | Set `production` for hardened runtime defaults |
+| `PORT` / `BACKEND_PORT` | No | `5000` | Local HTTP port |
+| `CORS_ORIGIN` | Direct browser access only | local allow / production deny | Comma-separated allowed frontend origins; the same-origin Netlify proxy does not need it |
+| `COOKIE_SECURE` | No | production-aware | Set `true` on Netlify and `false` for local HTTP |
+| `COOKIE_SAME_SITE` | No | `lax` | Refresh-cookie SameSite policy; `lax` is correct for the included frontend proxy |
+| `TRUST_PROXY` | No | production-aware | Set `1` behind a reverse proxy |
+| `SMTP_HOST` | Password reset | — | Hostinger SMTP host, normally `smtp.hostinger.com` |
+| `SMTP_PORT` | Password reset | `465` | SMTP port |
+| `SMTP_SECURE` | No | inferred from port | Set `true` for Hostinger port 465 |
+| `SMTP_USER` | Password reset | — | Hostinger mailbox address |
+| `SMTP_PASS` | Password reset | — | Hostinger mailbox password |
+| `SMTP_FROM` | No | `SMTP_USER` | Display name and sender address |
+
+## Netlify deployment
+
+This repository includes [`netlify.toml`](./netlify.toml) and [`netlify/functions/api.js`](./netlify/functions/api.js). In the backend Netlify site:
+
+1. Set this repository directory as the site base.
+2. Configure `MONGO_URI`, a strong `JWT_SECRET`, `ACCESS_TOKEN_EXPIRES_IN=15m`, `NODE_ENV=production`, `COOKIE_SECURE=true`, `COOKIE_SAME_SITE=lax`, `TRUST_PROXY=1`, and the Hostinger `SMTP_*` variables.
+3. Deploy. Requests to `/api/*` are routed to the Express Function.
+4. Copy the deployed site origin, such as `https://shopboard-api.netlify.app`, into the frontend site's `BACKEND_SERVICE_URL`.
+
+Node 22.22.2 is pinned in `netlify.toml` for consistent local, CI, and Function behavior.
+
+The frontend's same-origin proxy is the recommended browser path. It keeps the refresh cookie first-party on the frontend domain and forwards it to this service.
+
+## API map
+
+Public routes:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/health` | Service and database state |
+| `POST` | `/api/users/register` | Create a store administrator |
+| `POST` | `/api/users/login` | Sign in by email, username, or mobile |
+| `POST` | `/api/users/refresh` | Rotate refresh session and issue an access token |
+| `POST` | `/api/users/logout` | Revoke the current refresh session |
+| `POST` | `/api/users/password-reset/request` | Send a generic-response OTP request |
+| `POST` | `/api/users/password-reset/confirm` | Consume OTP, reset password, and revoke all sessions |
+
+Authenticated routes:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET/PATCH/DELETE` | `/api/users/me` | Profile management or permanent account deletion |
+| `GET/POST` | `/api/inventory` | Search/list or create products |
+| `PATCH` | `/api/inventory/:id` | Update catalogue fields |
+| `PATCH` | `/api/inventory/:id/stock` | Record a stock adjustment |
+| `GET` | `/api/inventory/:id/movements` | Read stock audit history |
+| `DELETE` | `/api/inventory/:id` | Soft-archive a product |
+| `GET/POST` | `/api/orders` | Search/list or place orders |
+| `GET` | `/api/orders/:id` | Read one order |
+| `PATCH` | `/api/orders/:id/status` | Move through an allowed fulfilment transition |
+| `GET` | `/api/dashboard/overview` | KPIs, trends, alerts, and recent orders |
+| `GET/POST` | `/api/tasks` | List or create operational tasks |
+| `PATCH/DELETE` | `/api/tasks/:id` | Update or remove a task |
+| `GET` | `/api/data/templates/products` | Download product import template |
+| `GET` | `/api/data/templates/orders` | Download multi-line order import template |
+| `POST` | `/api/data/import/products` | Atomically import product CSV (`file`, max 2 MB/500 rows) |
+| `POST` | `/api/data/import/orders` | Atomically import order CSV (`file`, max 2 MB/500 rows) |
+| `GET` | `/api/data/export/products` | Download product CSV backup |
+| `GET` | `/api/data/export/orders` | Download order CSV backup |
+| `POST` | `/api/data/sample` | Add sample data to an empty account |
+| `DELETE` | `/api/data/reset` | Delete operational data after password and phrase confirmation |
+
+Successful item responses use `{ data }`, collections use `{ data, pagination }`, and errors use `{ message, code, details? }`.
+
+## Quality commands
+
+```bash
+npm test
+npm run check
+npm run audit
 ```
 
-
-## Contributing
-
-<!-- Contribution guidelines -->
-We welcome contributions from all developers and power users! To add new features or suggest improvements, follow these steps:
-
-1. Fork this repository to your own GitHub account.
-2. Clone the forked repository to your local machine.
-3. Create a new branch for your changes: `git checkout -b feature/add-new-feature`
-4. Make your changes to the `README.md` file or add new files as necessary.
-5. Commit your changes: `git commit -m "Add new feature for XYZ"`
-6. Push the changes to your GitHub fork: `git push origin feature/add-new-feature`
-7. Open a pull request from your forked repository to this original repository.
-
-
-
-## Contact
-
-<!-- Contact information -->
-- **Email**: [08.vikrambadesara@gmail.com](mailto:ranitmanik.dev@gmail.com)
-- **LinkedIn**: [Vikram Badesara](https://www.linkedin.com/in/vikrambadesara/)
-- **GitHub**: [Vikybad](https://github.com/Vikybad/)
-
-_Feel free to reach out if you have questions or just want to chat about web adventures!_
-
----
-
-<!-- Closing message -->
-<p align="center">
-    Thank you for using the <strong>README Template</strong>! Happy coding! 🚀
-</p>
-
+The legacy order/task aliases remain temporarily available for the raw frontend's older clients; new code uses the REST paths above.
